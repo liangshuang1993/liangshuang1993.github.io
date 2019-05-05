@@ -1,13 +1,21 @@
-<h2>Hello world</h2>
+---
+layout: home
+---
+<div class='user-details'>
+    <h2>Echo's website</h2>
+</div>
 
-<p>最新文章</p>
-
-    <ul>
-
-　　　　{% for post in site.posts %}
-
-　　　　　　<li>{{ post.date | date_to_string }} <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></li>
-
-　　　　{% endfor %}
-
-　　</ul>
+<div class='permlinks'>
+    <h2>Recent Posts</h2>
+    <d1>
+        {% for post in sites.posts limit:3 %}
+        <dt><code>{{ post.date | date_to_string }}</code><i class="fas fa-angle-double-right" aria-hidden="true"></i><a href="{{ post.url }}">{{ post.title }}</a> &nbsp;{% include status-indicator.html status=post.status%}</dt>
+        {% if post.description %}
+        <dd style="text-align: justify">
+            {{ post.description | markdownify}}
+        </dd>
+        {% endif %}
+        {% endfor %}
+        <p>... <a href="/blog">Full Posts List</a> </p>
+    </d1>
+</div>
