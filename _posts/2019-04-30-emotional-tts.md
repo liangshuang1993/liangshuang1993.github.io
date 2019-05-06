@@ -1,7 +1,7 @@
 ## A survey on emotional TTS
 
 
-####Exploring Transfer Learning for Low Resoure Emotional TTS
+#### Exploring Transfer Learning for Low Resoure Emotional TTS
 
 
 **该论文用的finetune的方法，每次生成一种情感tts模型**
@@ -26,7 +26,7 @@ https://arxiv.org/pdf/1901.04276.pdf
 后续可能会引入多说话人多情感。
 
 ----
-####Speaking Style Adaptation In Text-to-speech Synthesis Using Sequence-to-sequence Models With Attentions
+#### Speaking Style Adaptation In Text-to-speech Synthesis Using Sequence-to-sequence Models With Attentions
 
 finetune了tacotron，
 数据：
@@ -57,7 +57,7 @@ interrogative style：25minutes
 
 ---
 
-####Emotional End-to-End Neural Speech synthesizer
+#### Emotional End-to-End Neural Speech synthesizer
 
 **tacotron的基础上进行改进，引入emotion label；改进了tacotron的一些问题，如exposure bias problem和attention alignment的irregularity。**
 
@@ -68,7 +68,7 @@ interrogative style：25minutes
 
 模型结构如下图所示：
 
-![model](../papers/tts/1.png)
+![model](../../../papers/tts/1.png)
 
 其实就是将emotional label通过prenet之后，注入到attention RNN和decoder RNN。
 
@@ -95,14 +95,14 @@ interrogative style：25minutes
 __标签未知的情况下，一个简单的方法是与synthesiser一起学习control parameters。联合优化network weights和unknown control input可以用深度学习反向传播很容易地进行联合优化，称为discriminant condition codes（DCC），已经用来做speech recognition和speech synthesis to new speakers，或者learned control vectors。__
 <font color=#A52A2A>后续需要看下这些论文</font>
 
-Sentence-level  control  vectorsfor deep neural network speech synthesis用到了儿童有声书做数据集，和本文方法有点类似，不过论文是15年的了。
+Sentence-level control vectorsfor deep neural network speech synthesis用到了儿童有声书做数据集，和本文方法有点类似，不过论文是15年的了。
 
 ---
 
 ### VAE相关
 
 ---
-####Learning Latent Representations for Speech Generation and Transformation
+#### Learning Latent Representations for Speech Generation and Transformation
 
 https://arxiv.org/pdf/1704.04222.pdf
 
@@ -120,7 +120,7 @@ speech waveforms有复杂的分布，体现出variance，linguistic content，sp
 
 假设我们希望修改语句$x^{(i)}$的属性$a_k$,如说话人从$r_s$转到$r_t$，则latent attribute shift $v_{r_s-r_t}=μ_{r_t}-μ_{r_s}$。
 可以通过以下方法修改$x^(i)$:
-$z^(i)~q_\fai$
+$z^{(i)}\sim{q_\phi}$
 
 **实验**
 TIMIT 630说话人，每人10句话。
@@ -131,7 +131,7 @@ VAE和AE对比。
 ----
 
 
-####LEARNING LATENT REPRESENTATIONS FOR STYLE CONTROL AND TRANSFER INEND-TO-END SPEECH SYNTHESIS
+#### LEARNING LATENT REPRESENTATIONS FOR STYLE CONTROL AND TRANSFER INEND-TO-END SPEECH SYNTHESIS
 
 __tacotron2+VAE，进行style transfer，效果胜于GST，ICASSP 2019__
 __Expressive speech synthesis via modeling expressions with  variational autoencoder interspeech2018是用VAE+voiceloop：__
@@ -143,7 +143,7 @@ __Expressive speech synthesis via modeling expressions with  variational autoenc
 
 模型结构：
 
-![](../papers/tts/3.png)
+![](../../../papers/tts/3.png)
 
 recognition model用的是GST的reference encoder+全连接得到隐变量z的期望和方差。为了匹配维度，z需要先送入一个FC，之后加上text encoder state。
 
@@ -158,7 +158,7 @@ __VAE+voiceloop   interspeech 2018__
 https://www.kakuzawa.com/VAELoopDemo/
 
 模型：
-![](../papers/tts/4.png)
+![](../../../papers/tts/4.png)
 
 实验： 
 
@@ -180,7 +180,7 @@ https://www.kakuzawa.com/VAELoopDemo/
 
 ---
 
-####Robust And Fine-grained Prosody Control of End-to-end Speech Synthesis
+#### Robust And Fine-grained Prosody Control of End-to-end Speech Synthesis
 
 ICASSP2019
 
@@ -212,12 +212,12 @@ __依赖标注，参数式，interspeech2018，https://ttsdemos.github.io/__
 
 EMPHASIS采用的是cascade model，更加稳定。
 TTS系统的linguistic feature通常包含phoneme identification，tone（如中文），stress（如英文），prosody structure，syntactical structure和emotion type，这些特征都要用one-hot vector表示。由于phoneme-related features，包括phoneme identification，tone，stress，对于决定duration和acoustic feature而言是很强的特征，而emotional，prosodic feature相对较弱，这就会导致训练时，容易忽略后者，因此我们将他们分成两组，通过网络加强后者。
-![](../papers/tts/2.png)
+![](../../../papers/tts/2.png)
 
 __数据__：14小时汉语+3.5小时英语，一个说话人。30%疑问句，10%感叹句。（标贝数据目前只有570句问句，306句感叹句）标签：phoneme identity(specifically, one-hot  representation  of initials  and finals of Mandarin Pinyinandphonemes of English），tone of Mandarin syllable, stress of English syllable;the emotional & prosodic  linguistic features  include prosodic break,  prosodic level, word segmentation of Mandarin, syntactic level, part-of-speech tag and type of emotion, etc.
 __实验__：ABX test，EMPHASIS，Tacotron，Bi-LSTM，Concatenative，样音中断句韵律更自然，主要为疑问句，没有明显情绪。
 
-![](../papers/tts/abx.png)
+![](../../../papers/tts/abx.png)
 
 ---
 #### Multi-reference Tacotron by Intercross Training for Style Disentangling,Transfer and Control in Speech Synthesis
