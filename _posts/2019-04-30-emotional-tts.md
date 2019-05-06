@@ -219,7 +219,7 @@ __实验__：ABX test，EMPHASIS，Tacotron，Bi-LSTM，Concatenative，样音�
 ---
 #### Multi-reference Tacotron by Intercross Training for Style Disentangling,Transfer and Control in Speech Synthesis
 
-__投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encoder__
+__投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encoder，效果比较好__
 
 定义：
 - style class：speaker，emotion，prosody，可以拓展到其他方面
