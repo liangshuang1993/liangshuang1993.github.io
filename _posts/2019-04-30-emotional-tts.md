@@ -237,5 +237,11 @@ __投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encod
 数据：BAIDU Speech Department，conditioned on Mandarin phonemes and tones
 
 
+---
+
+#### NEURAL TTS STYLIZATION WITH ADVERSARIAL AND COLLABORATIVE GAMES
 
 
+__ICLR 2019，在GST的基础上利用gan解决style和content的分解问题__
+
+定义GST模型中content为$x_{txt}$, style为$x_{aud}$
