@@ -1,5 +1,16 @@
 ## A survey on emotional TTS
 
+<head>
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+            skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+            inlineMath: [['$','$']]
+            }
+        });
+    </script>
+</head>
 
 #### Exploring Transfer Learning for Low Resoure Emotional TTS
 
@@ -224,6 +235,15 @@ __实验__：ABX test，EMPHASIS，Tacotron，Bi-LSTM，Concatenative，样音�
 
 __投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encoder，效果比较好__
 
+
+该论文introduction中提出speech style transfer可以分为两类：supervised way：将attributes's id作为另外的model input，这在multi-speaker TTS中很有效，但是他不能处理复杂的style如emotion或者prosody；unsupervised way：将E2E models和reference encoder结合到AE，或者VAE中，可以将对任意complex style建模，投射到一个continuous latent space中。
+
+另一个很重要的问题是：如何分解style？
+
+本文的贡献：
+- introduce a multi-reference encoder to GST-Tacotron
+- introduce intercross training to extract and seperate different classes of different classes of speech styles.
+
 定义：
 - style class：speaker，emotion，prosody，可以拓展到其他方面
 - style instance：**speaker class**有300个不同的speaker，**emotion class**有happy，sad，angry，fear，confuse，surprise，neutral； 
@@ -234,7 +254,28 @@ __投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encod
     - poetry: slow, obeys ruls of rhyming
     - call-center： relative fast, sweet
 
-数据：BAIDU Speech Department，conditioned on Mandarin phonemes and tones
+模型：
+每个sub-encoder只负责对一种style进行建模。
+
+__intercross training：__
+
+![](../../../papers/tts/7.png)
+
+__interference:__
+- style distangling: 给定一个reference audio，每个encoder可以得到出一个特定的风格。
+- style transfer: 每个分解后的style embedding可以进行自由组合，得到新的音频。
+- style control: 每个encoder得到的style embedding进行线性差值，可以进行style control
+
+![](http://latex.codecogs.com/gif.latex?SE_{to}=SE_{from}+\alpha(SE_{to}-SE_{from}))
+- random sampling: ![](http://latex.codecogs.com/gif.latex?SE_{random}=\sum_{k=1}^Ksoftmax(\alpha_k)STE_k)
+
+_STE指的是sub-encoder的style token embedding，_(http://latex.codecogs.com/gif.latex?\alpha\sim N(0,1))
+
+
+
+
+
+数据：BAIDU Speech Department，conditioned on Mandarin phonemes and tones, __110hours,178 females,122 males__
 
 
 ---
@@ -244,4 +285,27 @@ __投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encod
 
 __ICLR 2019，在GST的基础上利用gan解决style和content的分解问题__
 
-定义GST模型中content为$x_{txt}$, style为$x_{aud}$
+定义GST模型中content为$x_{txt}$, style为$x_{aud}$,$x_{aud}$中包含有style component s和other factor z，如和$x_{txt}对应的$verbal content，因此我们的目标是将z和s分解出来
+
+![](../../../papers/tts/5.png)
+
+参考图像 https://arxiv.org/pdf/1611.02200.pdf
+
+loss函数：
+
+![](../../../papers/tts/6.png)
+
+D有三种作用：
+- 1: fake from paired input
+- 2: fake from unparied input
+- 3: real audio sample
+
+
+数据：
+- EMT-4 24 hours, happy, sad, angry andneutral, same speaker
+- VCTK 44 hours
+
+实验： 没有测MOS，样音
+- content vs. style disentanglement ability
+- effictiveness of style modeling
+- controllability
