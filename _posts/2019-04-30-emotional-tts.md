@@ -255,28 +255,51 @@ __投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encod
     - call-center： relative fast, sweet
 
 模型：
-每个sub-encoder只负责对一种style进行建模。
+每个sub-encoder只负责对一种style进行建模，有N个encoder时，在训练的时候也要输入N个音频，其中第n个音频的的第n个属性应当与target的第n个属性相同。
+
 
 __intercross training：__
 
 ![](../../../papers/tts/7.png)
 
-__interference:__
+![](../../../papers/tts/8.png)
+
+直接用这个模型训练时，模型收敛不好，因为被这种多个encoder style embedding的概念混淆了，因此我们这里引入了style classification task，优化![](http://latex.codecogs.com/gif.latex?L_{classification})。除此之外呢，我们引入了一个orthogonality constraint来加强style embeddings之间的独立性：
+
+![](http://latex.codecogs.com/gif.latex?L_orthogonality=\sum_{ij}||H_i^T-H_j||_F^2)
+
+最终的loss:
+
+![](http://latex.codecogs.com/gif.latex?L=L_{IT}+\beta\dot(L_{classification})+\gamma\dot(L_orghogonality))
+
+
+
+__实验数据及结果__
 - style distangling: 给定一个reference audio，每个encoder可以得到出一个特定的风格。
 - style transfer: 每个分解后的style embedding可以进行自由组合，得到新的音频。
 - style control: 每个encoder得到的style embedding进行线性差值，可以进行style control
-
-![](http://latex.codecogs.com/gif.latex?SE_{to}=SE_{from}+\alpha(SE_{to}-SE_{from}))
+    ![](http://latex.codecogs.com/gif.latex?SE_{to}=SE_{from}+\alpha(SE_{to}-SE_{from}))
 - random sampling: ![](http://latex.codecogs.com/gif.latex?SE_{random}=\sum_{k=1}^Ksoftmax(\alpha_k)STE_k)
 
-_STE指的是sub-encoder的style token embedding，_(http://latex.codecogs.com/gif.latex?\alpha\sim N(0,1))
-
-
-
-
+    _STE指的是sub-encoder的style token embedding，_(http://latex.codecogs.com/gif.latex?\alpha\sim N(0,1))
 
 数据：BAIDU Speech Department，conditioned on Mandarin phonemes and tones, __110hours,178 females,122 males__
 
+- single-reference: 
+    - style distangling: 实验选定了20个speakers, 用t-SNE进行可视化。
+
+    ![](../../../papers/tts/9.png)
+
+    - style transfer: GST得到的音频长度会和reference audio的长度接近而不是和文本成正比，但是本文提出的方法则解决了这个问题。
+
+    - style control: 可以控制移动的比例。
+
+    -few shot/one-shot learning: 对未见reference audio进行了实验。one-shot的接受率有20%。之后用这些失败的音频进行fine-tune,最终得到了100%的接受率。文中提到保持text encoder固定效果最好。
+
+- multi-reference: 2-reference models to control two style classes: speaker and prosody. 30 hours, 27 speakers, 5 prosodies.
+
+    - style distangling: 每个speaker选择了100句话，用t-SNE进行可视化。
+    ![](../../../papers/tts/10.png)
 
 ---
 
