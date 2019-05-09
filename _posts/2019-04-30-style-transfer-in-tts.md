@@ -271,7 +271,7 @@ __投稿interspeech2019，在GST-tacotron基础上引入了multi-reference encod
     - call-center： relative fast, sweet
 
 模型：
-每个sub-encoder只负责对一种style进行建模，有N个encoder时，在训练的时候也要输入N个音频，其中第n个音频的的第n个属性应当与target的第n个属性相同。
+每个sub-encoder只负责对一种style进行建模，有N个encoder时，在训练的时候也要输入N个音频，其中第n个音频的的第n个属性应当与target的第n个属性相同。通过这些reference encoder可以得到N个style embedding,最后将这些embedding拼到text encoder的输出上，再送入tacotron中。
 
 
 __intercross training：__
@@ -319,7 +319,7 @@ __实验数据及结果__
 
 ---
 
-#### NEURAL TTS STYLIZATION WITH ADVERSARIAL AND COLLABORATIVE GAMES
+#### Neural TTS Stylization with Adversarial and Collaborative Games
 
 
 __ICLR 2019，在GST的基础上利用gan解决style和content的分解问题__
@@ -369,7 +369,7 @@ style loss:
 **reconstruction loss**:
 - mel谱的reconstruction loss：
     ![](/papers/tts/23.png)
-- latent space的reconstruction loss，这里引入了一个分类器C，C和(http://latex.codecogs.com/gif.latexEnc_s)共享所有层，只是最后加了一个全连接层，输出类别。
+- latent space的reconstruction loss，这里引入了一个分类器C，C和![](http://latex.codecogs.com/gif.latex?Enc_s)共享所有层，只是最后加了一个全连接层，输出类别。
     ![](/papers/tts/22.png)
 
 

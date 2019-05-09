@@ -24,6 +24,7 @@ linkedin_username: liangshuangsjtu/
 
 # Build settings
 markdown: kramdown
+mathjax: true
 # theme: minima
 # theme: jekyll-theme-clean-blog
 plugins:
