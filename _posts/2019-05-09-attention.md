@@ -4,6 +4,8 @@
 
 ![](/papers/tts/24.png)
 
+但是这种结构存在一定的问题，encoder最后一个时刻输出的向量是定长的，会损失一定的信息，因此后面基本都采用了attention结构。
+
 ![](/papers/tts/25.png)
 
 记encoder hidden states为$h_1,h_N \in R^{d_1}$,在第t个时间步，decoder hidden state记为$s_t\in R^{d_2}$, 可以依此计算出attention score $e^t$
@@ -26,6 +28,8 @@ attention其实有很多变种
 - dot-product: $s^Th_i\in R$, 要求$d_1=d_2$
 - multiplicative attention: $s^TWh_i \in R, W \in R^{d_2*d_1}$ 
 - additive attention: $v^Ttanh(W_1h_i+W_2s)$, $v \in R^{d_3}$是weight vector, $W_1 \in R^{d_3*d_1}, W_2 \in R^{d_3*d_2}, d_3$是超参
+
+additive attention实现起来有一些差异，有一种是BahdanauAttention， 它是使用上一时刻的隐状态$s_{i-1}$进行计算，还有一种是LuongAttention，是用当前时刻的隐状态$s_i$进行计算。
 
 下面用代码实现(_reference:https://github.com/IBM/pytorch-seq2seq/blob/master/seq2seq/models/attention.py_)：
 __pytorch版__
@@ -574,12 +578,9 @@ models文件夹中有五个文件：
 |--tacotron.py
 ```
 
-tacotron.py里面定义了seq2seq模型结构
+rnn_wrappers.py定义了两个wrapper
+
 ```python
-from tensorflow.contrib.seq2seq import BasicDecoder, BahdanauAttention, AttentionWrapper
-from tensorflow.contrib.rnn import GRUCell, MultiRNNCell, OutputPreojectionWrapper, ResidualWrapper
-
-
 class DecoderPrenetWrapper(RNNCell):
     '''Run RNN inputs through a prenet before sending them to the cell.'''
     def __init__(self, cell, is_training, layer_sizes):
@@ -606,6 +607,12 @@ class ConcatOutputAndAttentionWrapper(RNNCell):
     
     def zero_state(self, batch_size, dtype):
         return self._cell.zero_state(batch_size, dtype)
+```
+
+tacotron.py里面定义了seq2seq模型结构
+```python
+from tensorflow.contrib.seq2seq import BasicDecoder, BahdanauAttention, AttentionWrapper
+from tensorflow.contrib.rnn import GRUCell, MultiRNNCell, OutputPreojectionWrapper, ResidualWrapper
 
 attention_cell = AttentionWrapper(
     GRUCell(hp.attention_depth),
@@ -616,7 +623,8 @@ attention_cell = AttentionWrapper(
 
 attention_cell = DecoderPrenetWrapper(attention_cell, is_training, hp.prenet_depth)
 
-# concatenate attention context vector and RNN cell output into a 2*attention_depth=512D vector.
+# concatenate attention context vector and attention RNN cell output into a 2*attention_depth=512D vector
+# to form the input to the decoder RNN.
 concat_cell = ConcatOutputAndAttentionWrapper(attention_cell)
 
 # Decoder, layers specified bottom to top
@@ -642,3 +650,117 @@ else:
 )
 
 ```
+
+---
+
+Tacotron2中还用到了location sensitive attention，https://arxiv.org/pdf/1506.07503.pdf
+
+定义输入为$x=(x_1, ..., x_{L})$,经过encoder的输出为$h=(h_1,...,h_L)$,
+第i步
+$$\alpha_i=Attend(s_{i-1},\alpha_{i-1}, h)$$
+$$g_i=\sum^L_{j=1}\alpha_{i,j}h_j$$
+$$y_i\sim Generate(s_{i-1}, g_i)$$
+
+回忆下Bahdanau attention的公式:
+
+$$e_{i,j}=w^Ttanh(Ws_{i-1}+Vh_j+b)$$
+location-sensitive attention利用了上一时刻产生的alignment信息。对每个位置j前一时刻的alignment$\alpha_{i-1}$提取k个向量$f_{i,j}\in R^k$：
+$$f_i=F*\alpha_{i-1}, F\in R^{k*r}$$
+
+$$e_{i,j}=w^Ttanh(Ws_{i-1}+Vh_j+Uf_{i,j}+b)$$
+
+下面看下tacotron2里面是怎么实现这种attention的
+
+```python
+def _location_sensitive_score(W_query, W_fil, W_keys):
+    dtype = W_query.dtype
+    num_units = W_keys.shape[-1].value or array_ops.shape(W_keys)[-1]
+
+    v_a = tf.get_variable('attention_variable_projection', shape=[num_units], dtype=dtype,
+                          initializer=tf.xavier_initializer())
+    b_a = tf.get_variable('attention_bias', shape=[num_units], dtype=dtype,
+                          initializer=tf.zeros_initializer())
+    return tf.reduce_mean(v_a * tf.tanh(W_keys + W_query + W_fil + b_a), [2])
+
+
+class LocationSensitiveAttention(BahdanauAttention):
+    def __init__(self, num_units, memory, hparams, is_training, mask_encoder=True,
+                 memory_sequence_length=None, smoothing=False, cumulcate_weights=True):
+        """
+        Args:
+            num_units: the depth of the query mechanism
+            memory: the memory to query, usually the output of an RNN encoder
+            smoothing: determines which normalization function to use. default is softmax. 
+                       If smoothing is enabled, use a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
+                       This is mainly used if the model wants to attend to multiple input parts
+        """
+        normalization_function = _smoothing_normalization if smoothing else None
+        memory_length = memory_sequence_length if mask_encoder else None
+        super(LocationSensitiveAttention, self).__init__(
+            num_units=num_units,
+            memory=memory,
+            memory_sequence_length=memory_length,
+            probability_fn=normalization_function
+        )
+        self.location_convolution = tf.layers.Conv1D(filters=hparams.attention_filters,
+                                                     kernel_size=hparams.attention_kernel,
+                                                     padding='same',
+                                                     use_bias=True,
+                                                     bias_initializer=tf.zeros_initializer())
+        self.location_layer = tf.layers.Dense(units=num_units, use_bias=False, dtype=tf.float32)
+        self._cumulate = cumulcate_weights
+        self.synthesis_constraint = hparams.synthesis_constraint and not is_training
+        self.attention_win_size = tf.convert_to_tensor(hparams.attention_win_size, dtype=tf.int32)
+        self.constraint_type = hparams.synthesis_constraint_type
+
+    def __call__(self, query, state, prev_max_attentions):
+        previous_alignments = state
+        with variable_scope.variable_scope(None, 'Location_Sensitive_Attention', [query]):
+            processed_query = self.query_layer(query) if self.query_layer else query
+            processed_query = tf.expand_dims(processed_query, 1)
+
+            expand_alignments = tf.expand_dims(previous_alignments, axis=2)
+            f = self.location_convolution(expand_alignments)
+            processed_location_features = self.location_layer(f)
+            energy = _location_sensitive_score(processed_query, processed_location, self.keys)
+        
+        alignments = self._probability_fn(energy, previous_alignments)
+        max_attentions = tf.argmax(alignments, -1, output_typtf.int32)
+
+        if self._cumulate:
+            next_state = alignments + previous_alignments
+        else:
+            next_state = alignments
+        
+        return alignments, next_state, max_attentions
+```
+
+---
+
+最近还有一种叫做forward attention
+
+https://arxiv.org/pdf/1807.06736.pdf
+
+这篇论文中提到了一种对attention alignment的一种改进方法，__windowing__, 在每个时间步只考虑固定长度$\hat x=[x_{p-2}, ..., x_{p+w}]$，这种方法可以使得对齐更稳定，并且减少计算量。
+
+在*语音合成*领域中，x和o之间的对齐，表示了linguistic feature是如何映射到对应的acoustic feature上的。在合成数十帧的时候，attention还是应当集中在一个phone上面，之后再逐渐移动到下一个phone上面，方向是单调的。这种说法和之前看到一篇论文中说法是一致的。
+
+在每个时间步t, 定义$q_t$是output sequence的query（通常是decoder RNN的hidden state），记$\pi \in \{1,2,...,N\}$是隐变量类别，代表根据分布$p(\pi_t|x, q_t)$所选择的hidden representation。
+$y_t(n)=p(\pi_t=n|x, q_t)$, 可以得到$c_t=\sum^N_{n=1}y_t(n)x_n$。
+
+假定$\pi_t$仅与$x$和$q_t$有关。则记alignment path为
+$$p(\pi_{1:t}|x,q_{1:t})=\prod^t_{t'=1}p(\pi_{t'}|x,q_{t'})=\prod^t_{t'=1}y_{t'}(\pi_{t'})$$,初始化$\pi_0=1$
+
+和CTC的计算类似，前向变量
+
+![](/papers/tts/26.png)
+
+可以通过$\alpha_{t-1}(n)$和$\alpha_{t-1}(n-1)$递归地求$\alpha_{t}(n)$
+
+$$\alpha_{t}(n)=(\alpha_{t-1}(n) + \alpha_{t-1}(n-1)y_t(n))$$
+
+定义
+![](/papers/tts/27.png)
+
+可以由下式计算context vector:
+$$c_t=\sum^N_{n=1}\hat\alpha_t(x)x(n)$$
