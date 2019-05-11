@@ -764,3 +764,16 @@ $$\alpha_{t}(n)=(\alpha_{t-1}(n) + \alpha_{t-1}(n-1)y_t(n))$$
 
 可以由下式计算context vector:
 $$c_t=\sum^N_{n=1}\hat\alpha_t(x)x(n)$$
+
+完整的算法流程图如下所示：
+
+![](/papers/tts/38.png)
+
+文章还提出了一种改进后的方法**forward attention with transition agent**：
+
+定义一个由一层hidden layer和sigmoid output组成的transition agent DNN，每个时间步输出为$u_t \in (0,1)$，$u_t$表示第t个时间步attended phone应该向前移动的概率，这个DNN网络的输入是$c_t, o_{t-1}, q_t$拼接起来的向量。
+
+算法流程如下：
+
+![](/papers/tts/39.png)
+
