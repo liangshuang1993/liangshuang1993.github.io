@@ -741,7 +741,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 
 https://arxiv.org/pdf/1807.06736.pdf
 
-这篇论文中提到了一种对attention alignment的一种改进方法，__windowing__, 在每个时间步只考虑固定长度$\hat x=[x_{p-2}, ..., x_{p+w}]$，这种方法可以使得对齐更稳定，并且减少计算量。
+这篇论文中提到了一种对attention alignment的一种改进方法，__windowing__, 在每个时间步只考虑固定长度$\hat x=[x_{p-2}, ..., x_{p+w}]$，这种方法可以使得对齐更稳定，并且减少计算量。最新版本的tacotron2加入了这部分代码。
 
 在*语音合成*领域中，x和o之间的对齐，表示了linguistic feature是如何映射到对应的acoustic feature上的。在合成数十帧的时候，attention还是应当集中在一个phone上面，之后再逐渐移动到下一个phone上面，方向是单调的。这种说法和之前看到一篇论文中说法是一致的。
 
