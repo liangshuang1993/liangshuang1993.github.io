@@ -777,3 +777,70 @@ $$c_t=\sum^N_{n=1}\hat\alpha_t(x)x(n)$$
 
 ![](/papers/tts/39.png)
 
+
+
+---
+
+下面介绍下大名鼎鼎的Transformer
+
+在序列模型中,很多都用到了RNN层.还有很多网络是序列计算的,这就使得我们无法采用并行计算的方式.本文中提出了一种叫做Transformer的模型,它不再采用RNN,而是全都是用了attention,可以进行并行化.
+
+模型结构如下图所示:
+
+![](/papers/tts/55.png)
+
+**encoder**
+encoder中包含6个一样的层.每层都含有两个子层,第一个是多头self-attention,第二层是position-wise全连接层.在这两个子层中,都加了residual,并加入了layer normalization.为了维度上可以直接想家,模型中的embedding层和所有的sub-layer,维度都是512维.
+
+**decoder**
+decoder中也是包含6个完全一样的层.除了encoder中介绍的那两种层之外,还引入了了一个multi-head attention,作用在encoder的输出上.和encoder中类似,在每个子层上添加了residual connections以及layer normalization.另外还修改了decoder中的self-attention层,添加了mask,防止拿到当前位置之后的信息.
+
+**attention**
+
+![](/papers/tts/56.png)
+
+attention的输入有三种数据,分别为query, keys, values. query和keys的维度为$d_k$,values的维度为$d_v$.
+
+$$Attention(Q, K, V) = softmax(\frac{QK}{\sqrt{d_k}})V$$
+
+**multi-head attention**
+
+多头attention可以让模型同时从不同的表征空间中,注意到不同位置的信息.不像普通的attention那样,直接将 queries,keys, values投影到$d_{model}$维,而是分h次,将它们投影到{d_k,d_k,d_v}上.
+
+$$MultiHead(Q, K, V)=Concat(head_1, ..., head_h)W^O$$
+$$head_i=Attention(QW^Q_i,KW^K_i,VW^V_i)$$
+
+即先将query, key, value分h次投射到不同的维度上,$W^Q_i \in R^{d_{model}\times d_k},W^K_i \in R^{d_{model}\times d_k},W^V_i \in R^{d_{model}\times d_v}, W^O \in R^{hd_v\times d_{model}}$
+
+在实验中采用的是$h=8,d_k=d_v=d_{model}/h=64$
+
+
+模型中不同位置attention的使用方法:
+- encoder-decoder attention处,query来自decoder中的前一层,keys和values来自encoder的输出.这和普通的seq2seq模型类似.
+
+- encoder中的self-attention层,key,value,query来自同一个地方,即encoder前一层的输出.
+
+- decoder中的self-attention层,为了防止信息向左流动,我们将这里的attention加入了mask.
+
+除了attention层之外,encoder和decoder中的每一层都包含了一个全连接网络,包含两层线性变换,之间有ReLU,其实是两层kernel size是1的CNN层,input和output的维度为512,中间层的维度是2048.
+
+**position encoding**
+
+还有一个很重要的内容是position encoding.由于我们的模型中没有CNN和RNN,我们还需要注入一些位置信息.如果将K,V按行打乱训练,attention得到的结果还是一样的.因此我们将input embedding加入positional encoding.positional encoding和embedding的维度相同,都是$d_{model}$.
+
+$$PE_{(pos, 2i)}=sin(pos/10000^{2i/d_{model}})$$
+$$PE_{(pos, 2i+1)}=cos(pos/10000^{2i/d_{model}})$$
+
+
+由下表可以看到,当序列长度n小于维度d时,self-attention层比RNN层更快.
+> attention层的好处在于可以一步到位捕捉到全局的联系,因为它直接将序列两两比较(代价是计算量变为$O(n^2)$,当然由于是纯矩阵运算,这个计算量相当也不是很严重);相比之下,RNN层需要一步步地推才能捕捉到,而CNN则需要通过层叠来扩大感受野,这是Attention明显的优势.
+
+
+(引用自 https://kexue.fm/archives/4765)
+![](/papers/tts/57.png)
+
+
+下面就可以进行代码实现了.
+
+_tensorflow版_
+
