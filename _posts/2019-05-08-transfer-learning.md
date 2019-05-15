@@ -100,3 +100,102 @@ MCD实验
 - 只预训练decoder比预训练decoder+encoder conditioning效果还要好
 
 ![](/papers/tts/16.png)
+
+---
+
+#### Transfer Learning from Speaker Verification to Multispeaker Text-To-Speech Synthesispeaker adaptation
+
+这篇论文是google中的NIPS2018的论文，值得好好一读．
+
+文章提出的模型主要包含三部分：
+- speaker encoder network,用speaker verification task训练出的,这个网络所用的数据是另一个**独立的,无文本,含噪声**的数据集.只需要输入任一说话人几秒音频,即可以产生固定维度的embedding vector
+- 基于tacotron2的网络,用上述的speaker embedding做condition,拿文本做输入,输出mel谱
+- 基于wavenet的vocoder
+
+这样得到的网络,可以模仿任意说话人(包含未见说话人),而且不需要很多有文本的音频
+
+- synthesis network: 1.2K speakers
+- speaker encoder networ: 18K speakers
+
+文章Speaker adaptation in DNN-based speech synthesis using d-vectors和本文方法有些类似,但本文不需要中间的linguistic features,并且speaker embedding network不限制在一个固定的speaker集合中.并且发现实现zero-shot transfer需要几千个speaker,要比那篇文章多得多.
+
+**speaker encoder**
+
+采用了这篇文章的结构:_Generalized end-to-end loss forspeaker verification_
+
+这个网络将任意长度的mel谱序列转成固定长度的**d-vector**. 训练的数据集都切割为1.6s,和speaker identity一起训练,不需要文本,mel谱维度为40维.
+
+模型结构为:3层LSTM,768cells, 每层都要投射到256维.最后一帧的最上层的输出进行L2正则,得到最终的embedding.
+
+在inference的时候,任意长度分为800ms大的窗口,50%的重叠.网络在每个窗口上面独立运行,最终结果进行平均和正则,得到最终的embedding.
+
+**synthesizer**
+
+和deepvoice2中的方法类似,构建一个多说话人tacotron2,每个时间步上,将encoder output和target speaker的embedding进行concat,和deepvoice2不同的是,本文只是简单将embedding传到attention layer就可以收敛.
+
+
+对比了模型的两种变种:
+- 用speaker encoder计算embedding
+- Baseline, 为训练集中每个说话人优化一个固定的embedding.
+
+这篇文章是用音素训练的,它指出音素可以使得收敛更快,对于不常见的单词和名词发音更好.模型用了预训练的speaker encoder(参数是冻结的),提取目标音频的speaker embedding,进行训练.训练的时候,不需要指定speaker identifier label.
+
+模型的loss是L1+L2 loss, 实际中,发现模型对noisy training data的鲁棒性更好.
+
+**实验**
+
+在inference时,模型可以用任意的文本和与之不对应的音频进行训练.
+
+对于tacotron2部分,用两个数据集进行了训练:
+- 用VCTK(44小时,109speaker, 大部分英式英语)
+- LibriSpeech(436小时,1172speaker, 大部分美式英语, 没有标点,来源是有声书,同一个说话人的tone和style也会有很大变化).用ASR将语音切分为短音频,将时长中位数从14s降到5s. LibriSpeech很多录音含有很严重的环境背景噪音,对target谱进行了降噪过程,speaker encoder的输入是没有降噪的.
+
+由于VCTK的音频将干净,因此用ground truth训练wavenet也能很好的工作,但是对于Librispeech而言,必须要用tacotron2生成的mel谱训练wavenet.
+
+speaker encoder用的数据集包含36M语句,18K美式英语,时长中位数3.9s.
+
+1. naturalness
+
+评估的语句是训练集中没有的100句话,一组测试用已见说话人,一组测试用未见说话人,每个人,随机选择一个长度5s的音频来计算speaker embedding.
+
+![](/papers/tts/42.png)
+
+LibriSpeech的MOS略低,可能是以下原因:缺少标点;背景噪声更高
+
+未见说话人的MOS得分高了大概0.2,可能是随机选择reference utterance导致的结果.
+
+测试中发现有时候会模仿reference speech的韵律,尤其是LibriSpeech多样化的数据中更常见,说明了speaker identity和prosody没有分解.
+
+
+2. similarity
+
+![](/papers/tts/40.png)
+
+未见说话人的相似度较低.
+speaker encoder使用北美口音语音训练的,accent mismatch容易降低VCTK的效果.
+
+![](/papers/tts/41.png)
+
+3. speaker verification
+
+用113K speaker的28M句话,重新训练一个新的speaker encoder网络,用来评估.评估时用了VCTK里的11个人,LibriSpeech的10个人.每个人用了100句话测试.
+实验表明,用大数据集如LibriSpeech训练时,效果较好.
+
+4. exploration of effect of the speaker encoder
+
+分别用了以下三种数据训练
+- LibriSpeech Other, 461小时,1166说话人
+- VoxCeleb, 139K句,1121说话人
+- VoxCeleb2, 1.09M句,5994说话人
+
+下分析了说话人对于speaker encoder的影响,为了防止其在小数据集上的过拟合,在小数据集(前两个)用的网络256维LSTM,64维线性,输出的embedding也是64维.
+
+![](/papers/tts/43.png)
+
+
+**结论**
+
+通过利用迁移学习的方法,实现了多说话人TTS.speaker encoder所需要的数据更容易获取,它们不需要文本,且所需的质量较低. 不过,modeling speaker variation用了低维度的向量,限制了reference speech的处理.
+
+----
+
