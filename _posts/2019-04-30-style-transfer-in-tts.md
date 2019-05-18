@@ -381,3 +381,28 @@ style loss:
 - content vs. style disentanglement ability
 - effictiveness of style modeling
 - controllability
+
+---
+Parrotron: An End-to-End Speech-to-Speech Conversion Model and its Applications to Hearing-Impaired Speech and Speech Separation
+
+# google投interspeech2019的文章
+
+**text-independent, many-to-one voice conversion task,输入是paired data,预处理后的特征为mel谱**
+
+**encoder**
+2CNN-->BCLSTM(bidirectional convolutional LSTM)-->3BLSTM-->linear projection
+
+**decoder**
+用的tacotron2的decoder,后面可以接griffin-lim/WaveRNN
+
+**multitask training with an ASR decoder**
+
+![](/papers/tts/58.png)
+
+
+**实验**
+训练的数据是多个不同说话人的音频,对应到一个指定说话人.后者的音频则是由google的parallel wavenet-based TTS提供.
+
+30000小时数据,24百万句.
+
+不过比较有意思的是,这个可以用于语音分离.有一个实验是重构出多说话人混杂的音频中声音最大的那个说话人,实验最多有8个人.
