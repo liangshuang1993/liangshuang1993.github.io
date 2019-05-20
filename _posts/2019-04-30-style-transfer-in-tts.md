@@ -383,7 +383,7 @@ style loss:
 - controllability
 
 ---
-Parrotron: An End-to-End Speech-to-Speech Conversion Model and its Applications to Hearing-Impaired Speech and Speech Separation
+#### Parrotron: An End-to-End Speech-to-Speech Conversion Model and its Applications to Hearing-Impaired Speech and Speech Separation
 
 # google投interspeech2019的文章
 

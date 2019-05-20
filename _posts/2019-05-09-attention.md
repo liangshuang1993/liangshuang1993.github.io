@@ -840,7 +840,19 @@ $$PE_{(pos, 2i+1)}=cos(pos/10000^{2i/d_{model}})$$
 ![](/papers/tts/57.png)
 
 
-下面就可以进行代码实现了.
+下面放一个layer normalization的代码
 
-_tensorflow版_
+```python
+def ln(inputs, epsilon=1e-8, scope='ln'):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+        inputs_shape = inputs.get_shape()
+        params_shape = inputs_shape[-1: ]
+        mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
+        beta = tf.get_variable('beta', params_shape, initializer=tf.zeros_initializer())
+        gamma = tf.get_variable('gamma', params_shape, initializer=tf.ones_initializer())
+        normalized = (inputs - mean) / ((variance + epsilon) ** (.5))
+        outputs = gamma * normalized + beta
+
+    return outputs
+```
 
