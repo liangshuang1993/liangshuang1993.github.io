@@ -199,3 +199,88 @@ speaker encoder使用北美口音语音训练的,accent mismatch容易降低VCTK
 
 ----
 
+
+#### An Unsupervised Autoregressive Model for Speech Representation Learning
+
+今天偶然看到了这篇文章,这篇文章和*Semi-Supervised Training for Improving Data Efficiency in End-to-End Speech Synthesis*出自一个作者.
+
+和Elmo类似,本文希望可以通过无监督学习speech representation,之后可以再用这些特征来针对不同的downstream task训练.
+
+为了学习task无关的特征,并且尽可能保留多的特征,我们希望可以从特征中恢复原始的speech,常用的有两种loss:
+- autoencoding loss
+- autoregressive loss
+
+文章说如果没有其他限制的话,直接1到1的mapping就可以使得autoencoding loss最小了,因此autoregressive loss更好,它不需要其他的技术.
+
+autoregressive loss属于self-supervised loss的一种,也有一些其他的方法用于unsupervised speech representation,但是这些文章没有研究representation的transferability.然后文章这里也说了,它的想法是受到NLP一些大规模pretrained模型的影响:
+- Deep contextualized word representation
+- Universal language model fine-tuningfor text classification
+- Improving language understanding by generative pre-training
+- Bert:Pre-training of deep bidirectional transformers for language understanding
+
+本文提出了一种新的autoregressive结构,称为Autoregressive Predictive Coding(APC).
+
+目前也有论文讲这种方法,如wavenet, Representation learning withcontrastive predictive coding.本文主要研究频谱上的prediction而不是wave上的.
+
+**Autoregressive Predictive Coding**
+
+语言模型可以预测一句话出现的概率:
+$$P(t_1, t_2, ..., t_N) = \prod_{k=1}^N  P(t_k|t_1, t_2, ..., t_{k-1})$$
+
+直接负的极大似然优化:
+
+$$\sum_{k=1}^N-logP(t_1, t_2, ..., t_{k-1};\theta_t, \theta_{rnn}, \theta_s)$$
+
+其中$\theta_t$将token映射为embedding,$\theta_{rnn}是RNN参数$,$\theta_s$是softmax层,预测每个token上的概率.
+
+和language model类似,这里也是用RNN进行建模.每个speech data,$t_k$表示一帧,这里不需要$\theta_t$来做映射,LM的softmax层也需要替换成regression层.
+
+对于APC而言,直接探索局部的平滑就足够预测下一帧了,为了使APC学习更多的global structure,我们希望模型可以预测当前帧前面的第n帧.也就是说,给定一个acoustic feature $(x_1, x_2, ..., x_T)$,RNN每接收一个$x_t$,输出一个相同维度的$y_t$,模型用L1 loss优化.
+
+$$\sum^{T-n}_{i=1}|x_{i+n} - y_i|$$
+
+**Contrastive Predictive Coding**
+
+CPC希望给定ccontext $h_i=(x_1,x_2,...,x_i)$可以学到能够将future frame $x_{i+n}$和随机选择的负样本$\tilde x$区分开的representation.
+
+CPC含有三个模块:
+- frame encoder $E_{frm}$
+- 单向RNN $E_{ctx}$
+- 打分函数f
+
+首先用frame encoder将输入序列编码为z.之后将z传到RNN中,得到context representation c.最后给定一帧和一个context,最后的得分为$f(x,h)=exp(z^TWc)$,其中z是x的frame representation,c是h的context representation.
+
+给定一个$h_i$, target future frame $x_{i+n}$和一组负样本X,loss为:
+
+$$L_n(h_i, x_{i+n}, \tilde X) = log \frac{f(x_{i+n}, h_i)}{\sum_{x \in \tilde X \cup {x_{i+n}}}f(x, h_i)}$$
+
+根据文献*Representation Learning with Contrastive Predictive Coding*,最小化上面的loss会使f(x, h)近似$\frac{p_n(x|h)}{q(x)}$q代表所求的负样本的分布.换句话说,选择的n和所求的分布都会影响z和x所学到的特征.
+
+
+CPC更注重于能够区分target和负样本的信息,APC则注重能预测目标frame的信息,会忽视整个数据集都有的信息.
+
+
+**实验**
+
+用LibriSpeech来训练(APC和CPC),里面有360小时,921说话人.用80维的mel谱,对每个speaker进行了标准正则化.
+
+我们构建了phone classification和speaker verification任务,数据用了Wall Street Journal和TIMIT.
+
+APC的具体实现:多层的单向LSTM网络+residual connections,和"Google’s neural machine translation system"论文一致,每层维度为512维
+CPC的具体实现:用“Representation learning withcontrastive predictive coding"的context encoder和scoring functional,将acoustic feature改为了mel谱,将frame encoder中的5层strided CNN改成了3层,512维全连接+ReLU.
+
+需要注意的是这里的都是非监督的,不能根据下游的任务调超参.
+
+对于phone classification,只用了一层分类器,对于speaker verification,用了LDA.
+
+**phone classification**
+
+实验表明APC比CPC的效果要好,并且step在2,3的时候效果最好,APC层数越深越好.
+
+
+**speaker verification**
+
+APC效果优于CPC优于i-vector,且step=1效果最好.同时发现,APC在低层相比高层,含有更多的speaker information.
+
+-----
+
