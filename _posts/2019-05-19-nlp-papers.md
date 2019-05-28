@@ -141,6 +141,93 @@ GPT和ELMo有两大不同:
 
 
 
+
+
+
+
+
+
+
+
+
 -------
 
 #### BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding
+
+
+和目前的language representation model不同的是,BERT预训练的是**双向表示**,在所有层中,既会拿左边context做condition,也会拿右边context做condition.之后,只需要一层额外的输出层,就可以创建state-of-the-art model,可以用于question answering, language inference,而不需要针对任务对模型做大量的修改.
+
+
+
+**model architecture**
+
+BERT模型基于多层双向Transformer encoder,定义Transformer block有L个, hidden size是H, self-attention头数为A. 设置feed-forward/filter size为4H.
+
+
+
+我们这里采用两种大小的模型:
+- BASE model: L=12, H=768, A=12, 总共参数量为110M
+- LARGE model: L=24, H=1024, A=16, 总参数量为340M
+
+
+**input representation**
+
+
+![](/papers/tts/69.png)
+
+
+**task #1: masked LM**
+
+为了训练一个深层bidirectional representation,我们可以将输入随机进行mask,只预测这些被mask的token,这称为masked LM. 最终相应mask的hidden vector. 随机选择15%的token,然后:
+- 80%概率,将这个token替换为[MASK]
+- 10%概率,用随机的单词替换,如my dog is hairy -> my dog is apple
+- 10%概率,不变
+
+
+
+
+**task #1: Next Sentence Prediction**
+
+很多NLP的任务,如QA和NLI都基于理解两个句子之间的关系的,这些没有直接被language modeling所捕捉. 为了训练一个理解两个句子之间关系的模型,我们预训练一个binarized next sentence prediction模型.进行训练的时候,50%的概率B是真正跟在A后面的,而50%的概率B是随机选择的.
+
+最终训好的模型准确率有97%-98%
+
+
+
+**finetune procedure**
+
+对于sequence-level classification任务.将第一个token([CLS])对应的最后的hidden state取出,记为C. 最后加一层分类层W,添加的参数量为K*H(K是分类类别数). BERT所有的参数和W所有的参数一起finetune. 
+
+
+finetuning中,模型大部分超参和pretraining中的仙童.dropout总是用0.1. 我们发现下面这些超参在左右任务上都表现很好
+- batch size: 16, 32
+- learning rate(Adam): 5e-5, 3e-5, 2e-5
+- number of epoch: 3, 4
+
+
+**BERT和GPT的比较**
+
+- GPT在BooksCorpus(800M words)上训练; BERT在BooksCorpus(800M words)和Wikipedia(2500M words)
+
+- GPT只有在fine-tuning的时候用sentence spearator([SEP])和classifier token([CLS]); BERT在pretrain的时候就学习了[SEP], [CLS]和sentence A/B embedding
+
+
+- GPT用的batch size=32000, 训练了1M步; BERT用batch size=128000, step是1M步
+
+
+- GPT在所有的fine-tuning实验中都用的learning rate是5e-5, BERT根据任务调节了learning rate
+
+
+
+-------
+
+#### MASS: Masked Sequence to Sequence Pre-training for Language Generation
+
+
+虽然Pre-training 和 fine-tuning,如BERT在自然语言理解(NLU)上面取得了非常大的进展,但是seq2seq的自然语言生成中,目前主流预训练模型并没有取得显著效果.MASS对句子随机屏蔽一个长度为k的连续片段，然后通过编码器-注意力-解码器模型预测生成该片段。
+
+![](https://image.jiqizhixin.com/uploads/editor/4a3fc479-3360-463b-a261-80cfb4a5da2e/640.png)
+
+
+
+----

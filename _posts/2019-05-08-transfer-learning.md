@@ -284,3 +284,70 @@ APC效果优于CPC优于i-vector,且step=1效果最好.同时发现,APC在低层
 
 -----
 
+
+#### Unsupervised Cross-Modal Alignment of Speech and Text Embedding Spaces
+
+依然是上面那位大佬最近两年发的文章, nips2018.
+
+
+摘要中提到,**不同语言的预料所学到的word embedding spaces可以在不需要平行数据的情况下对齐**.那么,语音的embedding space和文本的embedding space是否也可以学到这种cross-modal alignment呢? 本文首先单独学习speech embedding和text embedding, 之后再通过adversarial training, 将两者对齐.
+
+
+连续word embedding空间在各种语言中表现出类似的结构,目前已经有完全无监督的方式来学习cross-lingual alignment, 并且可以用于机器翻译. 这篇文章主要流程如下:
+- 用Speech2Vec 和 Word2Vec 分别学习speech 和 text embedding空间.
+- 用adversarial training来学习从speech embedding space 到 text embedding space的linear mapping(这样的话应该主要用于ASR了). 后面再加一个refinement.
+
+
+**Speech2Vec**
+
+首先简要介绍下Word2Vec. Word2Vec是两层全连接网络, 主要有两种训练方式: Skip-grams和CBOW. 
+- Skip-grams: 给定$w^{(n)}$, 希望$\{w^{(n-k)},...,w^{(n-1)},w^{(n+1)},...,w^{(n+k)}\}$的概率最大.
+- CBOW: 给定$\{w^{(n-k)},...,w^{(n-1)},w^{(n+1)},...,w^{(n+k)}\}$, 希望$w^{(n)}$的概率最大
+
+
+Speech2Vec借鉴了Word2Vec的思想. 和文本不同的是,word使用one-hot vector来表示的, 而audio segment使用不定长的acoustic feature序列表示的, $x=(x_1, x_2, ..., x_T), x$可以是MFCC, T是序列长度. 为了解决不定长的问题, Speech2Vec用了一对RNN来替代Word2Vec的全连接. 一个作为Encoder, 一个作为Decoder. 
+
+- Skip-grams: Encoder RNN接收audio segment作为输入, 将它编码成固定维度的embedding $z^{(n)}$. Decoder希望可以用z重建出$\{x^{(n-k)},...,x^{(n-1)},x^{(n+1)},...,x^{(n+k)}\}$
+- CBOW: 将$x^{(n)}$作为target, 希望可以从相邻的segment推出它.
+
+在训练好Speech2Vec模型之后, 每一个audio segment都可以用一个embedding vector来表示了. 这里又提到, Word2Vec中, 每一个单词的embedding是固定的. 但是对于audio segment而言, 每个word的instance是不同的(speaker, channel, 其他contextual differences都会对其产生影响), 因此每个单词都会用一个不同的embedding vector来表示, 同一个word的embedding vector可以进行平均来获得一个单一的word embedding.
+
+**Unsupervised Speech2Vec**
+
+和文本还有很大不同的是,文本的内容可以很容易地切割成word-like units, 但是speech很难做到这一点. 
+
+这篇文章中用的是off-the-shelf, full coverage, unsupervised segmentation system来将数据切成word-like units. 第一种叫做Bayesian embedded segmental Gauddian mixture model(BES-GMM), 第二个为K-means model(ES-Means), 是BES-GMM的近似. 第三个是SylSeg. 
+
+在用上述的segmentation方法获取audio segment后, 可以用Speech2Vec进行训练, 并得到相应的embedding. 这里又用了聚类,将embedding分为了K份, 对应K个word type. 可以将属于同一个cluster的embedding取平均值(代表着同一个单词).
+
+**Unsupervised Alignment of Speech and Text Embedding Spaces**
+
+将speech embedding space和word embedding space中的m和n个embedding记为$S=\{s_1, s_2, ..., s_m\} \subset R^{d_1}, T=\{t_1, t_2, ..., t_m\} \subset R^{d_2}$. 理想情况下,我们知道了一个字典指明了那个$s_i \in S$ 对应哪个 $t_j \in T$, 我们可以学到一个线性映射W, 即 $W^* = argmin_{W \in R^{d_2 \times d_1}}||WX-Y||^2$. 下面就介绍下如何在没有cross-modal supervision情况下去学习这个W.  基于*Word translation without parallel data*, 
+
+
+
+
+**Domain-Adversarial Training**
+
+定义一个discriminator, 区分WS和T, Ｗ可以试作为generator. 给定mapping, D通过下式进行优化:
+
+![](/papers/tts/70.png)
+
+给定D, W通过下式进行优化:
+
+![](/papers/tts/71.png)
+
+**refinement procedure**
+
+考虑S和T中最常见的words, 只保留它们共同最近的相邻点. 用Cross-Domain Similarity Local Scaling来决定最近共同相邻点. 之后应用$W^* = argmin_{W \in R^{d_2 \times d_1}}||WX-Y||^2$来改进W.
+
+
+_其实上面说的alignment并不是attention里面的alignment, 而是指的两个空间上的对应关系._
+
+
+
+本文主要在spoken word classification, spoken word synonyms retrieval, spoken word translation上进行了实验.
+
+
+
+-----
