@@ -221,6 +221,7 @@ finetuning中,模型大部分超参和pretraining中的仙童.dropout总是用0.
 
 -------
 
+
 #### MASS: Masked Sequence to Sequence Pre-training for Language Generation
 
 
@@ -230,4 +231,11 @@ finetuning中,模型大部分超参和pretraining中的仙童.dropout总是用0.
 
 
 
+定义$(x, y) \in (X, Y), x=(x_1, x_2, ..., x_m), y=(y_1, y_2, ..., y_n)$
+
+这里用的是无监督的方法, 给定单独的一个$x \in X, x^{\setminus u:v}$
+
 ----
+
+
+#### Unified Language Model Pre-training forNatural Language Understanding and Generation

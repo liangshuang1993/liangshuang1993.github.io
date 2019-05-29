@@ -290,7 +290,7 @@ APC效果优于CPC优于i-vector,且step=1效果最好.同时发现,APC在低层
 依然是上面那位大佬最近两年发的文章, nips2018.
 
 
-摘要中提到,**不同语言的预料所学到的word embedding spaces可以在不需要平行数据的情况下对齐**.那么,语音的embedding space和文本的embedding space是否也可以学到这种cross-modal alignment呢? 本文首先单独学习speech embedding和text embedding, 之后再通过adversarial training, 将两者对齐.
+摘要中提到,**不同语言的语料所学到的word embedding spaces可以在不需要平行数据的情况下对齐**.那么,语音的embedding space和文本的embedding space是否也可以学到这种cross-modal alignment呢? 本文首先单独学习speech embedding和text embedding, 之后再通过adversarial training, 将两者对齐.
 
 
 连续word embedding空间在各种语言中表现出类似的结构,目前已经有完全无监督的方式来学习cross-lingual alignment, 并且可以用于机器翻译. 这篇文章主要流程如下:
