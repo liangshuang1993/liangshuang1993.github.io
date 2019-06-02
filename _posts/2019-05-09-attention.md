@@ -790,10 +790,10 @@ $$c_t=\sum^N_{n=1}\hat\alpha_t(x)x(n)$$
 ![](/papers/tts/55.png)
 
 **encoder**
-encoder中包含6个一样的层.每层都含有两个子层,第一个是多头self-attention,第二层是position-wise全连接层.在这两个子层中,都加了residual,并加入了layer normalization.为了维度上可以直接想家,模型中的embedding层和所有的sub-layer,维度都是512维.
+encoder中包含6个一样的层.每层都含有两个子层,第一个是多头self-attention,第二层是position-wise全连接层.在这两个子层中,都加了residual,并加入了layer normalization.为了维度上可以直接相加,模型中的embedding层和所有的sub-layer,维度都是512维.
 
 **decoder**
-decoder中也是包含6个完全一样的层.除了encoder中介绍的那两种层之外,还引入了了一个multi-head attention,作用在encoder的输出上.和encoder中类似,在每个子层上添加了residual connections以及layer normalization.另外还修改了decoder中的self-attention层,添加了mask,防止拿到当前位置之后的信息.
+decoder中也是包含6个完全一样的层.除了encoder中介绍的那两种层之外,还引入了一个multi-head attention,作用在encoder的输出上.和encoder中类似,在每个子层上添加了residual connections以及layer normalization.另外还修改了decoder中的self-attention层,添加了mask,防止拿到当前位置之后的信息.
 
 **attention**
 
@@ -838,6 +838,111 @@ $$PE_{(pos, 2i+1)}=cos(pos/10000^{2i/d_{model}})$$
 
 (引用自 https://kexue.fm/archives/4765)
 ![](/papers/tts/57.png)
+
+
+pytorch实现(http://nlp.seas.harvard.edu/2018/04/03/attention.html):
+
+```python
+def clones(module, N):
+    "Produce N identical layers"
+    return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
+
+
+class Encoder(nn.Module):
+    def __init__(self, layer, N):
+        super(Encoder, self).__init__()
+        self.layers = clones(layer, N)
+        self.norm = LayerNorm(layer.size)
+    
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = layer(x, mask)
+        return self.norm(x)
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, features, eps=1e-6):
+        super(LayerNorm, self).__init__()
+        self.a_2 = nn.Parameter(torch.ones(features))
+        self.b_2 = nn.Parameter(torch.zeros(features))
+        self.eps = eps
+    
+    def forward(self, x):
+        mean = x.mean(-1, keepdim=True)
+        std = x.std(-1, keepdim=True)
+        return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
+
+
+class SublayerConnection(nn.Module):
+    def __init__(self, size, dropout):
+        super(SublayerConnection, self).__init__()
+        self.norm = LayerNorm(size)
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, x, sublayer):
+        return x + self.dropout(sublayer(self.norm(x)))
+
+
+class EncoderLayer(nn.Module):
+    def __init__(self, size, self_attn, feed_forward, dropout):
+        super(EncoderLayer, self).__init__()
+        self.self_attn = self_attn
+        self.feed_forward = feed_forward
+        self.sublayer = clones(SublayerConnection(size, dropout), 2)
+        self.size = size
+    
+    def forward(self, x, mask):
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
+        return self.sublayer[1](x, self.feed_forward)
+
+
+class Decoder(nn.Module):
+    def __init__(self, layer, N):
+        super(Decoder, self).__init__()
+        self.layers = clones(layer, N)
+        self.norm = LayerNorm(layer.size)
+    
+    def forward(self, x, memory, src_mask, tgt_mask):
+        for layer in self.layers:
+            x = layer(x, memory, src_mask, tgt_mask)
+        return self.norm(x)
+
+
+class DecoderLayer(nn.Module):
+    "Decoder is made of self-attn, src-attn, and feed forward"
+    def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
+        super(DecoderLayer, self).__init__()
+        self.size = size
+        self.self_attn = self_attn
+        self.src_attn = src_attn
+        self.feed_forward = feed_forward
+        self.superlayer = clones(SublayerConnection(size, dropout), 3)
+    
+    def forward(self, x, memory, src_mask , tgt_mask):
+        m = memory
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
+        x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
+        return self.sublayer[2](x, self.feed_forward)
+
+
+def attention(query, key, value, mask=None, dropout=None):
+    d_k = query.size(-1)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+    if mask is not None:
+        scores = scores.masked_fill(mask==0, -1e9)
+    p_attn = F.softmax(scores, dim=-1)
+    if dropout is not None:
+        p_attn = dropout(p_attn)
+    return torch.matmul(p_attn, value), p_attn
+
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, h, d_model, dropout=0.1):
+        super(MultiHeadAttention, self).__init__()
+        assert d_model % h == 0
+        self.d_k = d_model // h
+```
+
 
 
 下面放一个layer normalization的代码
