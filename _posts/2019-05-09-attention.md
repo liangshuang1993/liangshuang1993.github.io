@@ -789,58 +789,40 @@ $$c_t=\sum^N_{n=1}\hat\alpha_t(x)x(n)$$
 
 ![](/papers/tts/55.png)
 
+下面介绍下Transformer结构,并附上pytorch代码(http://nlp.seas.harvard.edu/2018/04/03/attention.html), 模型仍然是encoder-decoder结构
+
+```python
+class EncoderDecoder(nn.Module):
+    def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
+        super(EncoderDecoder, self).__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+        self.src_embed = src_embed
+        self.tgt_embed = tgt_embed
+        self.generator = generator
+    
+    def forward(self, src, tgt, src_mask, tgt_mask):
+        return self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask)
+    
+    def encode(self, src, src_mask):
+        return self.encoder(self.src_embed(src), src_mask)
+    
+    def decode(self, memory, src_mask, tgt, tgt_mask):
+        return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
+    
+
+class Generator(nn.Module):
+    """softmax"""
+    def __init__(self, d_model, vocab):
+        super(Generator, self).__init__()
+        self.proj = nn.Linear(d_model, vocab)
+    
+    def forward(self, x):
+        return F.log_softmax(self.proj(x), dim=-1)
+```
+
 **encoder**
 encoder中包含6个一样的层.每层都含有两个子层,第一个是多头self-attention,第二层是position-wise全连接层.在这两个子层中,都加了residual,并加入了layer normalization.为了维度上可以直接相加,模型中的embedding层和所有的sub-layer,维度都是512维.
-
-**decoder**
-decoder中也是包含6个完全一样的层.除了encoder中介绍的那两种层之外,还引入了一个multi-head attention,作用在encoder的输出上.和encoder中类似,在每个子层上添加了residual connections以及layer normalization.另外还修改了decoder中的self-attention层,添加了mask,防止拿到当前位置之后的信息.
-
-**attention**
-
-![](/papers/tts/56.png)
-
-attention的输入有三种数据,分别为query, keys, values. query和keys的维度为$d_k$,values的维度为$d_v$.
-
-$$Attention(Q, K, V) = softmax(\frac{QK}{\sqrt{d_k}})V$$
-
-**multi-head attention**
-
-多头attention可以让模型同时从不同的表征空间中,注意到不同位置的信息.不像普通的attention那样,直接将 queries,keys, values投影到$d_{model}$维,而是分h次,将它们投影到{d_k,d_k,d_v}上.
-
-$$MultiHead(Q, K, V)=Concat(head_1, ..., head_h)W^O$$
-$$head_i=Attention(QW^Q_i,KW^K_i,VW^V_i)$$
-
-即先将query, key, value分h次投射到不同的维度上,$W^Q_i \in R^{d_{model}\times d_k},W^K_i \in R^{d_{model}\times d_k},W^V_i \in R^{d_{model}\times d_v}, W^O \in R^{hd_v\times d_{model}}$
-
-在实验中采用的是$h=8,d_k=d_v=d_{model}/h=64$
-
-
-模型中不同位置attention的使用方法:
-- encoder-decoder attention处,query来自decoder中的前一层,keys和values来自encoder的输出.这和普通的seq2seq模型类似.
-
-- encoder中的self-attention层,key,value,query来自同一个地方,即encoder前一层的输出.
-
-- decoder中的self-attention层,为了防止信息向左流动,我们将这里的attention加入了mask.
-
-除了attention层之外,encoder和decoder中的每一层都包含了一个全连接网络,包含两层线性变换,之间有ReLU,其实是两层kernel size是1的CNN层,input和output的维度为512,中间层的维度是2048.
-
-**position encoding**
-
-还有一个很重要的内容是position encoding.由于我们的模型中没有CNN和RNN,我们还需要注入一些位置信息.如果将K,V按行打乱训练,attention得到的结果还是一样的.因此我们将input embedding加入positional encoding.positional encoding和embedding的维度相同,都是$d_{model}$.
-
-$$PE_{(pos, 2i)}=sin(pos/10000^{2i/d_{model}})$$
-$$PE_{(pos, 2i+1)}=cos(pos/10000^{2i/d_{model}})$$
-
-
-由下表可以看到,当序列长度n小于维度d时,self-attention层比RNN层更快.
-> attention层的好处在于可以一步到位捕捉到全局的联系,因为它直接将序列两两比较(代价是计算量变为$O(n^2)$,当然由于是纯矩阵运算,这个计算量相当也不是很严重);相比之下,RNN层需要一步步地推才能捕捉到,而CNN则需要通过层叠来扩大感受野,这是Attention明显的优势.
-
-
-(引用自 https://kexue.fm/archives/4765)
-![](/papers/tts/57.png)
-
-
-pytorch实现(http://nlp.seas.harvard.edu/2018/04/03/attention.html):
 
 ```python
 def clones(module, N):
@@ -863,8 +845,8 @@ class Encoder(nn.Module):
 class LayerNorm(nn.Module):
     def __init__(self, features, eps=1e-6):
         super(LayerNorm, self).__init__()
-        self.a_2 = nn.Parameter(torch.ones(features))
-        self.b_2 = nn.Parameter(torch.zeros(features))
+        self.a_2 = nn.Parameters(torch.ones(features))
+        self.b_2 = nn.Parameters(torch.zeros(features))
         self.eps = eps
     
     def forward(self, x):
@@ -877,7 +859,7 @@ class SublayerConnection(nn.Module):
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
         self.norm = LayerNorm(size)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = dropout
     
     def forward(self, x, sublayer):
         return x + self.dropout(sublayer(self.norm(x)))
@@ -894,8 +876,14 @@ class EncoderLayer(nn.Module):
     def forward(self, x, mask):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         return self.sublayer[1](x, self.feed_forward)
+```
 
 
+**decoder**
+decoder中也是包含6个完全一样的层.除了encoder中介绍的那两种层之外,还引入了一个multi-head attention,作用在encoder的输出上.和encoder中类似,在每个子层上添加了residual connections以及layer normalization.另外还修改了decoder中的self-attention层,添加了mask,防止拿到当前位置之后的信息.
+
+
+```python
 class Decoder(nn.Module):
     def __init__(self, layer, N):
         super(Decoder, self).__init__()
@@ -909,22 +897,37 @@ class Decoder(nn.Module):
 
 
 class DecoderLayer(nn.Module):
-    "Decoder is made of self-attn, src-attn, and feed forward"
     def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
         self.size = size
         self.self_attn = self_attn
         self.src_attn = src_attn
         self.feed_forward = feed_forward
-        self.superlayer = clones(SublayerConnection(size, dropout), 3)
+        self.sublayer = clones(SublayerConnection(size, dropout), 3)
     
-    def forward(self, x, memory, src_mask , tgt_mask):
+    def forward(self, x, memory, src_mask, tgt_mask):
         m = memory
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
 
 
+def subsequent_mask(size):
+    attn_shape = (1, size, size)
+    # np.triu 返回矩阵上三角部分,其余定义为0
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    return torch.from_numpy(subsequent_mask) == 0
+```
+
+**attention**
+
+![](/papers/tts/56.png)
+
+attention的输入有三种数据,分别为query, keys, values. query和keys的维度为$d_k$,values的维度为$d_v$.
+
+$$Attention(Q, K, V) = softmax(\frac{QK}{\sqrt{d_k}})V$$
+
+```python
 def attention(query, key, value, mask=None, dropout=None):
     d_k = query.size(-1)
     scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
@@ -934,30 +937,119 @@ def attention(query, key, value, mask=None, dropout=None):
     if dropout is not None:
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
+```
+
+**multi-head attention**
+
+多头attention可以让模型同时从不同的表征空间中,注意到不同位置的信息.不像普通的attention那样,直接将 queries,keys, values投影到$d_{model}$维,而是分h次,将它们投影到{d_k,d_k,d_v}上.
+
+$$MultiHead(Q, K, V)=Concat(head_1, ..., head_h)W^O$$
+$$head_i=Attention(QW^Q_i,KW^K_i,VW^V_i)$$
+
+即先将query, key, value分h次投射到不同的维度上,$W^Q_i \in R^{d_{model}\times d_k},W^K_i \in R^{d_{model}\times d_k},W^V_i \in R^{d_{model}\times d_v}, W^O \in R^{hd_v\times d_{model}}$
+
+在实验中采用的是$h=8,d_k=d_v=d_{model}/h=64$
 
 
+模型中不同位置attention的使用方法:
+- encoder-decoder attention处,query来自decoder中的前一层,keys和values来自encoder的输出.这和普通的seq2seq模型类似.
+
+- encoder中的self-attention层,key,value,query来自同一个地方,即encoder前一层的输出.
+
+- decoder中的self-attention层,为了防止信息向左流动,我们将这里的attention加入了mask.
+
+
+```python
 class MultiHeadAttention(nn.Module):
     def __init__(self, h, d_model, dropout=0.1):
         super(MultiHeadAttention, self).__init__()
         assert d_model % h == 0
         self.d_k = d_model // h
+        self.h = h
+        self.linears = clones(nn.Linear(d_model, d_model), 4)
+        self.attn = None
+        self.dropout = nn.Dropout(p=dropout)
+    
+    def forward(self, query, key, value, mask=None):
+        if mask is not None:
+            mask = mask.unsqueeze(1)
+        nbatches = query.size(0)
+
+        # do all the linear projections in batch
+        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))]
+
+        x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
+
+        # concat
+        x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        return self.linears[-1](x)
 ```
 
-
-
-下面放一个layer normalization的代码
+除了attention层之外,encoder和decoder中的每一层都包含了一个全连接网络,包含两层线性变换,之间有ReLU,input和output的维度为512,中间层的维度是2048.
 
 ```python
-def ln(inputs, epsilon=1e-8, scope='ln'):
-    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-        inputs_shape = inputs.get_shape()
-        params_shape = inputs_shape[-1: ]
-        mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
-        beta = tf.get_variable('beta', params_shape, initializer=tf.zeros_initializer())
-        gamma = tf.get_variable('gamma', params_shape, initializer=tf.ones_initializer())
-        normalized = (inputs - mean) / ((variance + epsilon) ** (.5))
-        outputs = gamma * normalized + beta
-
-    return outputs
+class PisitionwiseFeedForward(nn.Module):
+    def __init__(self, d_model, d_ff, dropout=0.1):
+        super(PisitionwiseFeedForward, self).__init__()
+        self.w_1 = nn.Linear(d_model, d_ff)
+        self.w_2 = nn.Linear(d_ff, d_model)
+        self.dropout = nn.Dropout(p=dropout)
+    
+    def forward(self, x):
+        return self.w2(self.dropout(F.relu(self.w_1(x))))
 ```
 
+
+**position encoding**
+
+还有一个很重要的内容是position encoding.由于我们的模型中没有CNN和RNN,我们还需要注入一些位置信息.如果将K,V按行打乱训练,attention得到的结果还是一样的.因此我们将input embedding加入positional encoding.positional encoding和embedding的维度相同,都是$d_{model}$.
+
+$$PE_{(pos, 2i)}=sin(pos/10000^{2i/d_{model}})$$
+$$PE_{(pos, 2i+1)}=cos(pos/10000^{2i/d_{model}})$$
+
+```python
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+    
+    def forward(self, x):
+        x = x + Variable(self.pe[:, :x.size(1)],
+                         requires_grad=True)
+        return self.dropout(x)
+```
+
+整体模型代码:
+
+```python
+def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1):
+    c = copy.deepcopy
+    attn = MultiHeadAttention(h, d_model)
+    ff = PositionwiseFeedForward(d_model, d_ff, dropout)
+    position = PositionalEncoding(d_model, dropout)
+    model= EncoderDecoder(
+        encoder=Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
+        decoder=Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N),
+        src_embed=nn.Sequential(Embedding(d_model, src_vocab), c(position)),
+        tgt_embed=nn.Sequential(Embedding(d_model, tgt_vocab), c(position)),
+        generator=Generator(d_model, tgt_vocab)
+    )
+    for p in model.parameters():
+        if p.dim() > 1:
+            nn.init.xavier_uniform(p)
+    return model
+```
+
+由下表可以看到,当序列长度n小于维度d时,self-attention层比RNN层更快.
+> attention层的好处在于可以一步到位捕捉到全局的联系,因为它直接将序列两两比较(代价是计算量变为$O(n^2)$,当然由于是纯矩阵运算,这个计算量相当也不是很严重);相比之下,RNN层需要一步步地推才能捕捉到,而CNN则需要通过层叠来扩大感受野,这是Attention明显的优势.
+
+
+(引用自 https://kexue.fm/archives/4765)
+![](/papers/tts/57.png)
