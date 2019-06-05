@@ -862,6 +862,7 @@ class SublayerConnection(nn.Module):
         self.dropout = dropout
     
     def forward(self, x, sublayer):
+        # 这里的layer normalization被移到了每个sub-layer的输入. 和GPT2中的用法一样.
         return x + self.dropout(sublayer(self.norm(x)))
 
 

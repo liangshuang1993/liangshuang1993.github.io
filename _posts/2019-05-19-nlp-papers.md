@@ -139,14 +139,57 @@ GPT和ELMo有两大不同:
 #### GPT2: Language Models are Unsupervised Multitask Learners
 
 
+GPT2是GPT的升级版本,规模更大,参数更多,训练数据也更多. GPT是12层的transformer, BERT最深是24层的transformer, GPT2达到了48层,参数有15亿,训练数据是WebText.
+
+在与训练阶段, GPT2采用了多任务的方式, 类似cs224中讲的decaNLP.
+
+目前主流而的机器学习模型都是在指定的任务上用一部分数据来训练数据, 再用一部分不相同但分布相同的的数据来测试其性能.这样的模式在特定场景下效果不错, 但是对于captioning model, 阅读理解, 图像分类, 输入的多样性和不确定性会把缺点暴露出来.
+
+文章认为,构建一个泛化能力更强的模型需要在更广泛的任务和领域上进行训练.
+
+**数据**
 
 
+学习单一任务可以用P(output|input)来表示, 对于多任务则用P(output|input, task)表示.
+
+之前大部分训练语言模型的工作都是采用单一领域的文本, 如新闻,维基百科,小说. 为了能使模型在很多领域都可以胜任, 我们采用的是大且多样化的数据.
+
+网络上爬了数据, 并且筛选了数据, 称这份数据集为WebText, 其中包含了4500万链接, 超过八百万个文档, 共40G. 移除了维基百科的文档, 因为WebText中会有一些重复的内容, 并且如果训练数据与测试数据重叠过多, 可能使分析变得复杂.
 
 
+现有的大规模语言模型包括预处理步骤, 如转小写, 分词, 处理字典外token. 将unicode字符串转为utf-8字节序列可以很好地解决这一问题. 目前在大规模的数据集上, 字符级别的语言模型相比词级别的语言模型并没有更大的竞争力.
+
+Byte Pair Encoding是一种字符级和单词级之间的实用语言模型, 它有效地在频率高符号序列的单词级别和频率低的符号序列的字符级别输入之间进行切换. BPE通常在Unicode上进行才做, 而不是字节序列. 该方法需要包含所有unicode编码, 以便能够对所有unicode字符串建模, 再添加任何多符号标记之前, 该方法的基本词汇表超过13万, 超过了BPE常用的3.2万到6.4万. 相比之下, 字节级别的BPE需要的字典大小只有256.
+
+然而, 直接将BPE用于字节序列会产生次优解, 因为BPE使用贪婪算法来构建词汇表. 我们发现BPE中包含了很多像dog这样的常用的词, 因为它们出现在了很多变体中, 如*dog. dog! dog?*, 这就会导致词典词槽分配与模型能力受到限制. 为了避免这个问题, 我们会防止BPE跨字符类别合并任何字节序列. 
 
 
+这种输入表征可以让我们结合单词级别的LM的实用性和字节级别的通用性结合起来. 这种方法可以给任意一个unicode字符串分配一个概率, 这就使得我们的LM不需要预处理, token化, 字典大小.
 
 
+**模型**
+
+LM仍然是基于Transformer, 和GPT中的大致相同有细微改动:
+- layer normalization被移到了每个sub-block的输入, 类似一个预激活的残差网络.
+- self-attention后面都添加了一个额外的layer normalization
+- residual layer的权重初始化的时候, 乘以了$1/\sqrt{(N)}$, N是residual层数.
+- 词典扩充到了50257.
+- context size从512加到了1024
+- batch size=512
+
+
+**实验**
+
+构建了四个模型
+
+|Paremeters | Layers | $d_{model}$|
+|------|:-----|:------|
+| 117M | 12 | 768|
+|345M|24|1024|
+|762M|36|1280|
+1542M|48|1600|
+
+最小的模型规模和GPT是一样的, 第二小的模型规模和最大的BERT一样, 最大的模型这里叫GPT-2.所有的模型目前仍处于一个欠拟合的状态.
 
 
 
@@ -238,4 +281,6 @@ finetuning中,模型大部分超参和pretraining中的仙童.dropout总是用0.
 ----
 
 
-#### Unified Language Model Pre-training forNatural Language Understanding and Generation
+#### Unified Language Model Pre-training for Natural Language Understanding and Generation
+
+
