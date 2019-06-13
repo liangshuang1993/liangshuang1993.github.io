@@ -49,6 +49,12 @@ $$p_{NA}(Y|X; \theta)=\sum_{f_1, ..., f_{t'} \in F}(\prod^{T'}_{t'=1}p_F(f_{t'}|
 
 其中$F=\{f_1, ..., f_{T'}|\sum^{T'}_{t'=1}f_{t'}=T, f_{t'} \in Z^*\}$是所有fertility序列的集合.
 
+**translation predictor and the decoding process**
+
+给定fertilities序列,最佳翻译仅需要独立地最大化每个输出位置的局部概率$Y=G(x_{1:T'}, f_{1:T'};\theta)$. 但是在整个fertility空间进行孙锁和边缘化仍然是难以处理的. 我们提供了三种启发式的decoding方法.
+
+- argmax decoding: 
+
 
 
 #### Non-Autoregressive Machine Translation with Auxiliary Regularization
