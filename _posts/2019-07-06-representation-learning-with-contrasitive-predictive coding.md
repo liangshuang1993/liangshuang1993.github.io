@@ -62,3 +62,13 @@ $$f_k(x_{t+k}, c_t) \propto \frac{p(x_{t+k}|c_t)}{p(x_{t+k})}$$
 我们这里使用一个log-bilinear模型:
 
 $$f_k(x_{t+k}, c_t)=exp(z^T_{t+k}W_kc_t)$$
+
+通过用density ratio $f(x_{t+k}, c_t)$, 并且利用了一个encoder来推断$z_{t+k}$, 我们的模型不需要对高维度分布$x_t$进行建模. 虽然我们不能直接评估$p(x), p(x|c)$, 我们可以用采样进行评估.可以利用noise-contrastive estimation和importance sampling.
+
+
+---
+附 NCE和importance sampling
+
+
+
+---
