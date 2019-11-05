@@ -42,7 +42,7 @@ $$I(Y; X) \leq H(Y)$$
 
 $$I(x; c)=\sum_{x, c}p(x, c)log\frac {p(x|c)}{p(x)}$$
 
-通过最大化encoded representation之间的互信息, 我们输入共有的隐变量.
+通过最大化encoded representation之间的互信息, 我们提取输入共有的隐变量.
 
 -----
 
